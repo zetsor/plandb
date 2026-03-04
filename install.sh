@@ -35,17 +35,18 @@ INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
 
 echo "Installing planq ${LATEST} (${OS}/${ARCH})..."
 
-# Create install dir if needed
-if [ ! -d "$INSTALL_DIR" ]; then
-  mkdir -p "$INSTALL_DIR" 2>/dev/null || sudo mkdir -p "$INSTALL_DIR"
-fi
+# Download to temp first, then move into place
+TMPFILE=$(mktemp)
+curl -fsSL "$URL" -o "$TMPFILE"
+chmod +x "$TMPFILE"
 
-# Download and install
-if [ -w "$INSTALL_DIR" ]; then
-  curl -fsSL "$URL" -o "${INSTALL_DIR}/${BINARY}"
-  chmod +x "${INSTALL_DIR}/${BINARY}"
+# Install — use sudo only if needed
+if [ -d "$INSTALL_DIR" ] && [ -w "$INSTALL_DIR" ]; then
+  mv "$TMPFILE" "${INSTALL_DIR}/${BINARY}"
 else
-  sudo curl -fsSL "$URL" -o "${INSTALL_DIR}/${BINARY}"
+  echo "Need permissions for ${INSTALL_DIR} — using sudo"
+  sudo mkdir -p "$INSTALL_DIR"
+  sudo mv "$TMPFILE" "${INSTALL_DIR}/${BINARY}"
   sudo chmod +x "${INSTALL_DIR}/${BINARY}"
 fi
 
