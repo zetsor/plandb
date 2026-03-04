@@ -25,8 +25,8 @@ def store_from_context(ctx: click.Context) -> QuickNoteStore:
 @click.group()
 @click.pass_context
 def cli(ctx: click.Context) -> None:
-    _ = ctx.ensure_object(dict)
-    ctx.obj["store"] = QuickNoteStore(resolve_db_path())
+    ctx_obj = cast(dict[str, object], ctx.ensure_object(dict))
+    ctx_obj["store"] = QuickNoteStore(resolve_db_path())
 
 
 @cli.command("add")

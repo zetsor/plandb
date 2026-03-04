@@ -132,46 +132,66 @@ class QuickNoteStore:
 
     def export_notes(self) -> list[dict[str, str | int]]:
         with self.connection() as conn:
-            rows = conn.execute(
-                "SELECT id, content, created_at FROM notes ORDER BY id DESC"
-            ).fetchall()
-            return [
-                {
-                    "id": int(row["id"]),
-                    "content": str(row["content"]),
-                    "created_at": str(row["created_at"]),
-                }
-                for row in rows
-            ]
+            rows = cast(
+                list[sqlite3.Row],
+                conn.execute(
+                    "SELECT id, content, created_at FROM notes ORDER BY id DESC"
+                ).fetchall(),
+            )
+            output: list[dict[str, str | int]] = []
+            for row in rows:
+                output.append(
+                    {
+                        "id": cast(int, row["id"]),
+                        "content": cast(str, row["content"]),
+                        "created_at": cast(str, row["created_at"]),
+                    }
+                )
+            return output
 
     def stats(self) -> dict[str, object]:
         with self.connection() as conn:
-            total_notes = conn.execute("SELECT COUNT(*) AS count FROM notes").fetchone()
-            tag_rows = conn.execute(
-                """
-                SELECT tag, COUNT(*) AS count
-                FROM note_tags
-                GROUP BY tag
-                ORDER BY count DESC, tag ASC
-                """
-            ).fetchall()
-            day_rows = conn.execute(
-                """
-                SELECT SUBSTR(created_at, 1, 10) AS day, COUNT(*) AS count
-                FROM notes
-                GROUP BY day
-                ORDER BY day ASC
-                """
-            ).fetchall()
+            total_notes = cast(
+                sqlite3.Row | None,
+                conn.execute("SELECT COUNT(*) AS count FROM notes").fetchone(),
+            )
+            tag_rows = cast(
+                list[sqlite3.Row],
+                conn.execute(
+                    """
+                    SELECT tag, COUNT(*) AS count
+                    FROM note_tags
+                    GROUP BY tag
+                    ORDER BY count DESC, tag ASC
+                    """
+                ).fetchall(),
+            )
+            day_rows = cast(
+                list[sqlite3.Row],
+                conn.execute(
+                    """
+                    SELECT SUBSTR(created_at, 1, 10) AS day, COUNT(*) AS count
+                    FROM notes
+                    GROUP BY day
+                    ORDER BY day ASC
+                    """
+                ).fetchall(),
+            )
+
+            tag_distribution: list[dict[str, object]] = []
+            for row in tag_rows:
+                tag_distribution.append(
+                    {"tag": cast(str, row["tag"]), "count": cast(int, row["count"])}
+                )
+
+            notes_per_day: list[dict[str, object]] = []
+            for row in day_rows:
+                notes_per_day.append(
+                    {"day": cast(str, row["day"]), "count": cast(int, row["count"])}
+                )
 
             return {
-                "total_notes": int(total_notes["count"] if total_notes else 0),
-                "tag_distribution": [
-                    {"tag": str(row["tag"]), "count": int(row["count"])}
-                    for row in tag_rows
-                ],
-                "notes_per_day": [
-                    {"day": str(row["day"]), "count": int(row["count"])}
-                    for row in day_rows
-                ],
+                "total_notes": cast(int, total_notes["count"] if total_notes else 0),
+                "tag_distribution": tag_distribution,
+                "notes_per_day": notes_per_day,
             }
