@@ -1,28 +1,27 @@
-use clap::Parser;
+use clap::{CommandFactory, Parser};
 use planq::cli::{Cli, Commands};
 use planq::db::init_db;
 
 fn main() {
     let cli = Cli::parse();
 
-    match &cli.command {
-        Commands::Mcp => {
+    match cli.command {
+        Some(Commands::Mcp) => {
             if let Err(err) = planq::mcp::run_mcp_server(&cli.db) {
                 eprintln!("error: {err}");
                 std::process::exit(1);
             }
         }
-        Commands::Serve { port } => {
+        Some(Commands::Serve { port }) => {
             let db_path = cli.db.clone();
-            let port = *port;
             let rt = tokio::runtime::Runtime::new().expect("failed to create tokio runtime");
             if let Err(err) = rt.block_on(planq::server::run_server(&db_path, port)) {
                 eprintln!("error: {err}");
                 std::process::exit(1);
             }
         }
-        Commands::Prompt { r#for, list } => {
-            if *list || r#for.is_none() {
+        Some(Commands::Prompt { r#for, list }) => {
+            if list || r#for.is_none() {
                 println!("Available platforms:");
                 println!("  mcp   — Claude Code, Cursor, Windsurf, any MCP client");
                 println!("  cli   — Codex, Aider, any CLI-based agent");
@@ -38,7 +37,33 @@ fn main() {
                 _ => unreachable!(),
             }
         }
-        _ => match init_db(&cli.db).and_then(|db| planq::cli::run(&db, cli)) {
+        None => match init_db(&cli.db) {
+            Ok(db) => {
+                if let Ok(Some(project_id)) = planq::db::get_meta(&db, "current_project") {
+                    if let Err(err) = planq::cli::project::status_cmd(
+                        &db,
+                        Some(&project_id),
+                        false,
+                        false,
+                        cli.json,
+                        cli.compact,
+                    ) {
+                        eprintln!("error: {err}");
+                        std::process::exit(1);
+                    }
+                } else {
+                    let _ = Cli::command().print_help();
+                    println!();
+                }
+            }
+            Err(_) => {
+                let _ = Cli::command().print_help();
+                println!();
+            }
+        },
+        Some(command) => match init_db(&cli.db)
+            .and_then(|db| planq::cli::run(&db, command, cli.json, cli.compact))
+        {
             Ok(()) => {}
             Err(err) => {
                 eprintln!("error: {err}");
