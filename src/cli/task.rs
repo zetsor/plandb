@@ -9,7 +9,7 @@ use crate::db::{
     get_lookahead, get_task, insert_task_between, list_dependencies, list_notes, list_task_files,
     list_tasks, pause_task, pivot_subtree, project_state, promote_ready_tasks, remove_dependency,
     snapshot_task_statuses, split_task, start_task, update_heartbeat, update_progress, update_task,
-    Database, NewSubtask, SplitPart, TaskListFilters,
+    Database, NewSubtask, PlanqError, SplitPart, TaskListFilters,
 };
 use crate::models::{
     generate_id, DependencyCondition, DependencyKind, RetryBackoff, Task, TaskKind, TaskStatus,
@@ -258,6 +258,7 @@ pub struct DoneArgs {
     pub task_id: String,
     #[arg(
         long,
+        alias = "output",
         help = "Result data (JSON string or plain text, passed to downstream tasks via handoff)"
     )]
     pub result: Option<String>,
@@ -306,8 +307,8 @@ struct ApproveArgs {
 }
 
 #[derive(Args, Debug)]
-struct TaskIdArg {
-    task_id: String,
+pub struct TaskIdArg {
+    pub task_id: String,
 }
 
 #[derive(Args, Debug)]
@@ -549,16 +550,7 @@ pub fn run(db: &Database, command: TaskCommand, global_json: bool, compact: bool
                 }
             }
         }
-        TaskSubcommand::Go(args) => {
-            let response = go_payload(db, args.project.as_deref(), &args.agent)?;
-            if global_json {
-                print_json(&response)?;
-            } else if response["task"].is_null() {
-                println!("no ready task found");
-            } else {
-                println!("started {}", response["task"]["id"].as_str().unwrap_or(""));
-            }
-        }
+        TaskSubcommand::Go(args) => go_cmd(db, &args, global_json)?,
         TaskSubcommand::Claim(args) => {
             let claimed = claim_task(db, &args.task_id, &args.agent)?;
             if global_json {
@@ -574,7 +566,8 @@ pub fn run(db: &Database, command: TaskCommand, global_json: bool, compact: bool
             }
         }
         TaskSubcommand::Start(args) => {
-            let task = start_task(db, &args.task_id)?;
+            let task = start_task(db, &args.task_id)
+                .map_err(|err| enrich_transition_error(db, &args.task_id, "start", err))?;
             if global_json {
                 if compact {
                     print_json(&minimal_task(&task))?;
@@ -604,45 +597,10 @@ pub fn run(db: &Database, command: TaskCommand, global_json: bool, compact: bool
                 println!("progress updated rows={changed}");
             }
         }
-        TaskSubcommand::Done(args) => {
-            let result = match args.result {
-                Some(text) => match serde_json::from_str(&text) {
-                    Ok(v) => Some(v),
-                    Err(_) => Some(serde_json::Value::String(text)),
-                },
-                None => None,
-            };
-            let task = complete_task(db, &args.task_id, result)?;
-            if let Some(files) = args.files {
-                let paths = parse_files_arg(&files);
-                let _ = add_task_files(db, &task.id, &paths)?;
-            }
-            let _ = promote_ready_tasks(db)?;
-            let next = if args.next {
-                let agent = args
-                    .agent
-                    .ok_or_else(|| anyhow!("--agent is required when using --next"))?;
-                Some(go_payload(db, Some(&task.project_id), &agent)?)
-            } else {
-                None
-            };
-            if global_json {
-                if args.next {
-                    print_json(&serde_json::json!({
-                        "completed": minimal_task(&task),
-                        "next": next,
-                    }))?;
-                } else if compact {
-                    print_json(&minimal_task(&task))?;
-                } else {
-                    print_json(&task)?;
-                }
-            } else {
-                println!("completed {}", task.id);
-            }
-        }
+        TaskSubcommand::Done(args) => done_cmd(db, args, global_json, compact)?,
         TaskSubcommand::Fail(args) => {
-            let task = fail_task(db, &args.task_id, &args.error)?;
+            let task = fail_task(db, &args.task_id, &args.error)
+                .map_err(|err| enrich_transition_error(db, &args.task_id, "fail", err))?;
             if global_json {
                 if compact {
                     print_json(&minimal_task(&task))?;
@@ -1248,6 +1206,140 @@ pub fn parse_files_arg(files: &str) -> Vec<String> {
         .filter(|s| !s.is_empty())
         .map(|s| s.to_string())
         .collect()
+}
+
+pub fn go_cmd(db: &Database, args: &GoArgs, json: bool) -> Result<()> {
+    let response = go_payload(db, args.project.as_deref(), &args.agent)?;
+    if json {
+        print_json(&response)?;
+    } else if response["task"].is_null() {
+        println!("no ready task found");
+    } else {
+        println!("started {}", response["task"]["id"].as_str().unwrap_or(""));
+    }
+    Ok(())
+}
+
+pub fn done_cmd(db: &Database, args: DoneArgs, json: bool, compact: bool) -> Result<()> {
+    let result = match args.result {
+        Some(text) => match serde_json::from_str(&text) {
+            Ok(v) => Some(v),
+            Err(_) => Some(serde_json::Value::String(text)),
+        },
+        None => None,
+    };
+    let task = complete_task(db, &args.task_id, result)
+        .map_err(|err| enrich_transition_error(db, &args.task_id, "complete", err))?;
+    if let Some(files) = args.files {
+        let paths = parse_files_arg(&files);
+        let _ = add_task_files(db, &task.id, &paths)?;
+    }
+    let _ = promote_ready_tasks(db)?;
+    let next = if args.next {
+        let agent = args
+            .agent
+            .ok_or_else(|| anyhow!("--agent is required when using --next"))?;
+        Some(go_payload(db, Some(&task.project_id), &agent)?)
+    } else {
+        None
+    };
+    if json {
+        if args.next {
+            print_json(&serde_json::json!({
+                "completed": minimal_task(&task),
+                "next": next,
+            }))?;
+        } else if compact {
+            print_json(&minimal_task(&task))?;
+        } else {
+            print_json(&task)?;
+        }
+    } else {
+        println!("completed {}", task.id);
+    }
+    Ok(())
+}
+
+fn enrich_transition_error(
+    db: &Database,
+    task_id: &str,
+    action: &str,
+    err: anyhow::Error,
+) -> anyhow::Error {
+    let Some(PlanqError::InvalidTransition(_)) = err.downcast_ref::<PlanqError>() else {
+        return err;
+    };
+
+    let Ok(task) = get_task(db, task_id) else {
+        return anyhow!(
+            "cannot {action} task {task_id}: task not found. Try `planq show {task_id}` to verify the id"
+        );
+    };
+
+    let suggestion = match (action, &task.status) {
+        ("start", TaskStatus::Ready) => {
+            format!(
+                "`planq task claim {} --agent <agent>` then `planq task start {}`",
+                task.id, task.id
+            )
+        }
+        ("start", TaskStatus::Pending) => {
+            format!(
+                "task is blocked by dependencies; inspect with `planq show {}`",
+                task.id
+            )
+        }
+        ("start", TaskStatus::Running) => {
+            format!(
+                "task is already running; continue work or run `planq done {}`",
+                task.id
+            )
+        }
+        ("complete", TaskStatus::Claimed) => {
+            format!(
+                "run `planq task start {}` first, then `planq done {}`",
+                task.id, task.id
+            )
+        }
+        ("complete", TaskStatus::Ready) => {
+            format!(
+                "run `planq task claim {} --agent <agent>` and `planq task start {}` first",
+                task.id, task.id
+            )
+        }
+        ("complete", TaskStatus::Pending) => {
+            format!(
+                "task is blocked by dependencies; inspect with `planq show {}`",
+                task.id
+            )
+        }
+        ("complete", TaskStatus::Done | TaskStatus::DonePartial) => {
+            format!(
+                "task is already completed; inspect with `planq show {}`",
+                task.id
+            )
+        }
+        ("fail", TaskStatus::Claimed) => {
+            format!(
+                "run `planq task start {}` first, then `planq task fail {} --error <msg>`",
+                task.id, task.id
+            )
+        }
+        ("fail", TaskStatus::Ready) => {
+            format!(
+                "run `planq task claim {} --agent <agent>` and `planq task start {}` first",
+                task.id, task.id
+            )
+        }
+        _ => format!("inspect task state with `planq show {}`", task.id),
+    };
+
+    anyhow!(
+        "cannot {action} task {}: current state is '{}'. Suggestion: {}",
+        task.id,
+        task.status,
+        suggestion
+    )
 }
 
 pub fn go_payload(
