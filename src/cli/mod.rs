@@ -73,7 +73,7 @@ pub struct Cli {
     pub compact: bool,
 
     #[command(subcommand)]
-    pub command: Commands,
+    pub command: Option<Commands>,
 }
 
 fn default_db_path() -> String {
@@ -182,20 +182,18 @@ pub enum Commands {
     },
 }
 
-pub fn run(db: &Database, cli: Cli) -> Result<()> {
-    match cli.command {
-        Commands::Project(command) => project::run(db, command, cli.json, cli.compact),
-        Commands::Task(command) => task::run(db, command, cli.json, cli.compact),
-        Commands::WhatIf(command) => task::run_what_if(db, command, cli.json, cli.compact),
-        Commands::Artifact(command) => artifact::run(db, command, cli.json),
-        Commands::Events(command) => events::run(db, command, cli.json),
-        Commands::Ahead { depth, project } => {
-            task::ahead_cmd(db, project, depth, cli.json, cli.compact)
-        }
+pub fn run(db: &Database, command: Commands, json: bool, compact: bool) -> Result<()> {
+    match command {
+        Commands::Project(command) => project::run(db, command, json, compact),
+        Commands::Task(command) => task::run(db, command, json, compact),
+        Commands::WhatIf(command) => task::run_what_if(db, command, json, compact),
+        Commands::Artifact(command) => artifact::run(db, command, json),
+        Commands::Events(command) => events::run(db, command, json),
+        Commands::Ahead { depth, project } => task::ahead_cmd(db, project, depth, json, compact),
         Commands::Use { project_id, clear } => {
             if clear {
                 crate::db::delete_meta(db, "current_project")?;
-                if cli.json {
+                if json {
                     print_json(&json!({"cleared": true}))?;
                 } else {
                     println!("cleared default project");
@@ -206,14 +204,14 @@ pub fn run(db: &Database, cli: Cli) -> Result<()> {
             if let Some(project_id) = project_id {
                 crate::db::get_project(db, &project_id)?;
                 crate::db::set_meta(db, "current_project", &project_id)?;
-                if cli.json {
+                if json {
                     print_json(&json!({"current_project": project_id}))?;
                 } else {
                     println!("default project: {project_id}");
                 }
             } else {
                 let current = crate::db::get_meta(db, "current_project")?;
-                if cli.json {
+                if json {
                     print_json(&json!({"current_project": current}))?;
                 } else if let Some(project_id) = current {
                     println!("{project_id}");
@@ -227,15 +225,15 @@ pub fn run(db: &Database, cli: Cli) -> Result<()> {
             project,
             detail,
             full,
-        } => project::status_cmd(db, project.as_deref(), detail, full, cli.json, cli.compact),
-        Commands::Go(args) => task::go_cmd(db, &args, cli.json),
-        Commands::Done(args) => task::done_cmd(db, args, cli.json, cli.compact),
-        Commands::List(args) => task::list_tasks_cmd(db, args, cli.json, cli.compact),
-        Commands::Add(args) => task::create_task_cmd(db, args, cli.json, cli.compact),
+        } => project::status_cmd(db, project.as_deref(), detail, full, json, compact),
+        Commands::Go(args) => task::go_cmd(db, &args, json),
+        Commands::Done(args) => task::done_cmd(db, args, json, compact),
+        Commands::List(args) => task::list_tasks_cmd(db, args, json, compact),
+        Commands::Add(args) => task::create_task_cmd(db, args, json, compact),
         Commands::Show(args) => {
             let t = crate::db::fuzzy_find_task(db, &args.task_id, None)?;
-            if cli.json || args.json {
-                if cli.compact {
+            if json || args.json {
+                if compact {
                     print_json(&compact_task(&t))?;
                 } else {
                     print_json(&t)?;
@@ -246,15 +244,13 @@ pub fn run(db: &Database, cli: Cli) -> Result<()> {
             Ok(())
         }
         Commands::Complete(args) | Commands::Finish(args) | Commands::Update(args) => {
-            task::done_cmd(db, args, cli.json, cli.compact)
+            task::done_cmd(db, args, json, compact)
         }
-        Commands::Tasks(args) | Commands::Ls(args) => {
-            task::list_tasks_cmd(db, args, cli.json, cli.compact)
-        }
-        Commands::Overview => project::status_cmd(db, None, false, false, cli.json, cli.compact),
+        Commands::Tasks(args) | Commands::Ls(args) => task::list_tasks_cmd(db, args, json, compact),
+        Commands::Overview => project::status_cmd(db, None, false, false, json, compact),
         Commands::Start(args) => {
             let task = crate::db::start_task(db, &args.task_id)?;
-            if cli.json {
+            if json {
                 print_json(&task)?;
             } else {
                 println!("started {}", task.id);
