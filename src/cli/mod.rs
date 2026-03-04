@@ -17,6 +17,7 @@ pub use task::{CreateTaskArgs, DoneArgs, GetTaskArgs, GoArgs, ListTasksArgs};
 #[command(
     name = "planq",
     version,
+    infer_subcommands = true,
     about = "Task graph primitive for AI agent orchestration.\n\n\
         Manages a dependency-aware task graph in SQLite. Three interfaces: CLI, MCP server, HTTP API.\n\
         Agents decompose work into tasks with dependencies, then execute via a claim-and-complete loop.\n\n\
@@ -143,6 +144,22 @@ pub enum Commands {
     Add(CreateTaskArgs),
     #[command(about = "Show full details of a task (shortcut for 'planq task get')")]
     Show(GetTaskArgs),
+    #[command(hide = true, about = "Alias for 'done'")]
+    Complete(DoneArgs),
+    #[command(hide = true, about = "Alias for 'done'")]
+    Finish(DoneArgs),
+    #[command(hide = true, about = "Alias for 'done'")]
+    Update(DoneArgs),
+    #[command(hide = true, about = "Alias for 'task list'")]
+    Tasks(ListTasksArgs),
+    #[command(hide = true, about = "Alias for 'task list'")]
+    Ls(ListTasksArgs),
+    #[command(hide = true, about = "Alias for 'status'")]
+    Overview,
+    #[command(hide = true, about = "Alias for 'task start'")]
+    Start(task::TaskIdArg),
+    #[command(hide = true, about = "Alias for '--version'")]
+    Version,
     #[command(about = "Start MCP server (stdio JSON-RPC for Claude Code, Cursor, Windsurf)")]
     Mcp,
     #[command(about = "Start HTTP server with REST API and SSE event stream")]
@@ -211,72 +228,8 @@ pub fn run(db: &Database, cli: Cli) -> Result<()> {
             detail,
             full,
         } => project::status_cmd(db, project.as_deref(), detail, full, cli.json, cli.compact),
-        Commands::Go(args) => {
-            let response = task::go_payload(db, args.project.as_deref(), &args.agent)?;
-            if cli.json {
-                print_json(&response)?;
-            } else if response["task"].is_null() {
-                println!("no ready task found");
-            } else {
-                println!("started {}", response["task"]["id"].as_str().unwrap_or(""));
-            }
-            Ok(())
-        }
-        Commands::Done(args) => {
-            let result_provided = args.result.is_some();
-            let result = match args.result {
-                Some(text) => match serde_json::from_str(&text) {
-                    Ok(v) => Some(v),
-                    Err(_) => Some(serde_json::Value::String(text)),
-                },
-                None => None,
-            };
-            let t = crate::db::complete_task(db, &args.task_id, result)?;
-            if let Some(files) = args.files {
-                let paths = task::parse_files_arg(&files);
-                let _ = crate::db::add_task_files(db, &t.id, &paths)?;
-            }
-            let _ = crate::db::promote_ready_tasks(db)?;
-            if !result_provided {
-                if let Ok(deps) = crate::db::list_dependencies(db, &t.id) {
-                    let feeds_count = deps
-                        .iter()
-                        .filter(|d| {
-                            d.from_task == t.id && matches!(d.kind, DependencyKind::FeedsInto)
-                        })
-                        .count();
-                    if feeds_count > 0 {
-                        eprintln!(
-                            "hint: this task feeds into {feeds_count} downstream task(s). Consider: planq done {} --result '{{\"key\": \"value\"}}'",
-                            t.id
-                        );
-                    }
-                }
-            }
-            let next = if args.next {
-                let agent = args
-                    .agent
-                    .ok_or_else(|| anyhow!("--agent is required when using --next"))?;
-                Some(task::go_payload(db, Some(&t.project_id), &agent)?)
-            } else {
-                None
-            };
-            if cli.json {
-                if args.next {
-                    print_json(&json!({
-                        "completed": minimal_task(&t),
-                        "next": next,
-                    }))?;
-                } else if cli.compact {
-                    print_json(&minimal_task(&t))?;
-                } else {
-                    print_json(&t)?;
-                }
-            } else {
-                println!("completed {}", t.id);
-            }
-            Ok(())
-        }
+        Commands::Go(args) => task::go_cmd(db, &args, cli.json),
+        Commands::Done(args) => task::done_cmd(db, args, cli.json, cli.compact),
         Commands::List(args) => task::list_tasks_cmd(db, args, cli.json, cli.compact),
         Commands::Add(args) => task::create_task_cmd(db, args, cli.json, cli.compact),
         Commands::Show(args) => {
@@ -290,6 +243,26 @@ pub fn run(db: &Database, cli: Cli) -> Result<()> {
             } else {
                 task::print_task_detail(&t);
             }
+            Ok(())
+        }
+        Commands::Complete(args) | Commands::Finish(args) | Commands::Update(args) => {
+            task::done_cmd(db, args, cli.json, cli.compact)
+        }
+        Commands::Tasks(args) | Commands::Ls(args) => {
+            task::list_tasks_cmd(db, args, cli.json, cli.compact)
+        }
+        Commands::Overview => project::status_cmd(db, None, false, false, cli.json, cli.compact),
+        Commands::Start(args) => {
+            let task = crate::db::start_task(db, &args.task_id)?;
+            if cli.json {
+                print_json(&task)?;
+            } else {
+                println!("started {}", task.id);
+            }
+            Ok(())
+        }
+        Commands::Version => {
+            println!("{} {}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
             Ok(())
         }
         Commands::Mcp | Commands::Serve { .. } | Commands::Prompt { .. } => {
