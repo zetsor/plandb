@@ -9,6 +9,12 @@ use serde::Serialize;
 use std::collections::{HashMap, HashSet};
 
 #[derive(Args, Debug)]
+#[command(
+    about = "Manage projects (create, list, status, dag)",
+    long_about = "Manage projects.\n\n\
+              A project is a container for a task graph. Create one first, then add tasks.\n\
+              The first project created is automatically set as the default (see 'planq use')."
+)]
 pub struct ProjectCommand {
     #[command(subcommand)]
     command: ProjectSubcommand,
@@ -16,27 +22,33 @@ pub struct ProjectCommand {
 
 #[derive(Subcommand, Debug)]
 enum ProjectSubcommand {
+    #[command(about = "Create a new project and set it as default")]
     Create(CreateProjectArgs),
+    #[command(about = "List all projects (optionally filter by status)")]
     List(ListProjectsArgs),
+    #[command(about = "Show project status with task counts")]
     Status(ProjectIdArg),
+    #[command(about = "Render the task dependency graph as a tree")]
     Dag(ProjectIdArg),
 }
 
 #[derive(Args, Debug)]
 struct CreateProjectArgs {
+    #[arg(help = "Project name")]
     name: String,
-    #[arg(long)]
+    #[arg(long, help = "Optional description of the project's goal")]
     description: Option<String>,
 }
 
 #[derive(Args, Debug)]
 struct ListProjectsArgs {
-    #[arg(long, value_parser = parse_project_status)]
+    #[arg(long, value_parser = parse_project_status, help = "Filter by status: active, completed, archived")]
     status: Option<ProjectStatus>,
 }
 
 #[derive(Args, Debug)]
 struct ProjectIdArg {
+    #[arg(help = "Project ID (uses default if not set)")]
     project_id: Option<String>,
 }
 

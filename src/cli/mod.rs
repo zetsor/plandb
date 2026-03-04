@@ -14,20 +14,53 @@ use std::str::FromStr;
 #[command(
     name = "planq",
     version,
-    about = "Task graph primitive for AI coding agents"
+    about = "Task graph primitive for AI agent orchestration",
+    long_about = "Task graph primitive for AI agent orchestration.\n\n\
+        Manages a dependency-aware task graph in SQLite. Three interfaces: CLI, MCP server, HTTP API.\n\
+        Agents decompose work into tasks with dependencies, then execute via a claim-and-complete loop.\n\n\
+        WORKFLOW:\n\
+        \x20 1. planq project create \"my-project\"                    Create a project\n\
+        \x20 2. planq task create --title \"Design API\" --dep t-xxx   Add tasks with dependencies\n\
+        \x20 3. planq go --agent agent-1                             Claim next ready task\n\
+        \x20 4. planq done <TASK_ID> --next --agent agent-1          Complete + claim next\n\
+        \x20 5. planq status                                         Check progress\n\n\
+        PLAN ADAPTATION:\n\
+        \x20 planq ahead              See upcoming tasks in the lookahead buffer\n\
+        \x20 planq what-if cancel     Preview effects of cancelling a task\n\
+        \x20 planq task insert        Add a step between existing tasks\n\
+        \x20 planq task amend         Annotate a future task with new context\n\
+        \x20 planq task pivot         Replace a subtree with new tasks\n\
+        \x20 planq task split         Decompose a task mid-execution\n\n\
+        MULTI-AGENT:\n\
+        \x20 Each agent runs: planq go --agent <NAME> → work → planq done <ID> --next --agent <NAME>\n\
+        \x20 The graph ensures no two agents claim the same task. Dependencies are enforced.\n\n\
+        OUTPUT MODES:\n\
+        \x20 Default human-readable output. Add --json for structured JSON. Add -c/--compact for token-efficient output.",
+    after_help = "EXAMPLES:\n\
+        \x20 planq project create \"auth-system\"                         Create project\n\
+        \x20 planq task create --title \"Design schema\" --kind research  Add a task\n\
+        \x20 planq task create --title \"Implement\" --dep t-a1b2c3       Add dependent task\n\
+        \x20 planq go --agent claude-1                                   Claim + start next ready\n\
+        \x20 planq done t-d4e5f6 --result '{\"api\":\"done\"}' --next --agent claude-1\n\
+        \x20 planq task insert --after t-a1 --before t-b2 --title \"Add validation\"\n\
+        \x20 planq what-if cancel t-a1b2c3                               Preview cancel effects\n\
+        \x20 planq status --detail                                       Per-task breakdown\n\
+        \x20 planq --json -c status                                      Compact JSON for LLMs\n\n\
+        ENVIRONMENT:\n\
+        \x20 PLANQ_DB     Path to SQLite database (default: .planq.db)"
 )]
 pub struct Cli {
-    #[arg(long, default_value_t = default_db_path(), global = true)]
+    #[arg(long, default_value_t = default_db_path(), global = true, help = "Path to SQLite database file")]
     pub db: String,
 
-    #[arg(long, global = true)]
+    #[arg(long, global = true, help = "Output as structured JSON")]
     pub json: bool,
 
     #[arg(
         long,
         short = 'c',
         global = true,
-        help = "Compact output for LLM consumption"
+        help = "Compact output optimized for LLM context windows"
     )]
     pub compact: bool,
 
@@ -41,43 +74,78 @@ fn default_db_path() -> String {
 
 #[derive(Subcommand, Debug)]
 pub enum Commands {
+    #[command(about = "Manage projects (create, list, status, dag)")]
     Project(project::ProjectCommand),
+    #[command(about = "Manage tasks (create, claim, complete, adapt)")]
     Task(task::TaskCommand),
+    #[command(about = "Preview effects of mutations without applying them")]
     WhatIf(task::WhatIfCommand),
+    #[command(about = "Attach/read artifacts (files, outputs) on tasks")]
     Artifact(artifact::ArtifactCommand),
+    #[command(about = "List or watch project events in real-time")]
     Events(events::EventsCommand),
-    #[command(about = "Lookahead buffer for running tasks")]
+    #[command(
+        about = "Show upcoming tasks after current running tasks complete",
+        long_about = "Show upcoming tasks after current running tasks complete.\n\n\
+                  Returns the lookahead buffer: currently running tasks and the next N layers\n\
+                  of tasks that will become ready as current tasks complete.\n\
+                  Useful for agents to anticipate what's coming and prepare."
+    )]
     Ahead {
-        #[arg(long, default_value_t = 2)]
+        #[arg(
+            long,
+            default_value_t = 2,
+            help = "Number of dependency layers to look ahead"
+        )]
         depth: usize,
-        #[arg(long)]
+        #[arg(long, help = "Project ID (uses default if not set)")]
         project: Option<String>,
     },
-    #[command(about = "Set/show default project")]
+    #[command(
+        about = "Set or show the default project (avoids --project on every command)",
+        long_about = "Set or show the default project.\n\n\
+                  Once set, all commands that accept --project will use this default.\n\
+                  Run without arguments to show current default. Use --clear to unset."
+    )]
     Use {
+        #[arg(help = "Project ID to set as default")]
         project_id: Option<String>,
-        #[arg(long)]
+        #[arg(long, help = "Clear the default project")]
         clear: bool,
     },
-    #[command(about = "Project status (uses default project)")]
+    #[command(
+        about = "Show project progress: done/total, ready tasks, running agents",
+        long_about = "Show project progress: done/total, ready tasks, running agents.\n\n\
+                  Three detail levels:\n\
+                  \x20 planq status             One-line summary with counts\n\
+                  \x20 planq status --detail     Per-task breakdown with status icons\n\
+                  \x20 planq status --full       All tasks + dependency edges"
+    )]
     Status {
-        #[arg(long)]
+        #[arg(long, help = "Project ID (uses default if not set)")]
         project: Option<String>,
-        #[arg(long, help = "Per-task detail")]
+        #[arg(long, help = "Show per-task breakdown")]
         detail: bool,
-        #[arg(long, help = "Full verbose output")]
+        #[arg(long, help = "Show all tasks and dependencies")]
         full: bool,
     },
-    #[command(about = "Start MCP server (stdio JSON-RPC for AI agents)")]
+    #[command(about = "Start MCP server (stdio JSON-RPC for Claude Code, Cursor, Windsurf)")]
     Mcp,
-    #[command(about = "Start HTTP server with REST API and SSE events")]
+    #[command(about = "Start HTTP server with REST API and SSE event stream")]
     Serve {
-        #[arg(long, short, default_value = "8484")]
+        #[arg(long, short, default_value = "8484", help = "Port to listen on")]
         port: u16,
     },
-    #[command(about = "Generate integration prompt for your platform")]
+    #[command(
+        about = "Generate integration prompt/config for your agent platform",
+        long_about = "Generate integration prompt/config for your agent platform.\n\n\
+                  Outputs ready-to-paste configuration for:\n\
+                  \x20 mcp   — MCP config JSON for Claude Code, Cursor, Windsurf\n\
+                  \x20 cli   — System prompt snippet for Codex, Aider, CLI agents\n\
+                  \x20 http  — REST API instructions for custom agents"
+    )]
     Prompt {
-        #[arg(long, value_parser = ["mcp", "cli", "http"], help = "Platform: mcp, cli, http")]
+        #[arg(long, value_parser = ["mcp", "cli", "http"], help = "Target platform: mcp, cli, or http")]
         r#for: Option<String>,
         #[arg(long, help = "List available platforms")]
         list: bool,

@@ -122,6 +122,17 @@ jobs:
         with:
           path: artifacts
 
+      - name: Generate checksums
+        run: |
+          cd artifacts
+          sha256sum \
+            planq-linux-x86_64/planq-linux-x86_64 \
+            planq-linux-aarch64/planq-linux-aarch64 \
+            planq-darwin-x86_64/planq-darwin-x86_64 \
+            planq-darwin-aarch64/planq-darwin-aarch64 \
+            planq-windows-x86_64.exe/planq-windows-x86_64.exe \
+          | sed 's|[^ ]*/||' > ../checksums.txt
+
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
@@ -134,3 +145,4 @@ jobs:
             artifacts/planq-darwin-x86_64/planq-darwin-x86_64
             artifacts/planq-darwin-aarch64/planq-darwin-aarch64
             artifacts/planq-windows-x86_64.exe/planq-windows-x86_64.exe
+            checksums.txt

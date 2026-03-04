@@ -8,6 +8,12 @@ use std::thread;
 use std::time::Duration;
 
 #[derive(Args, Debug)]
+#[command(
+    about = "List or watch project events in real-time",
+    long_about = "List or watch project events.\n\n\
+              Events are emitted on every task state change (created, claimed, started, done, failed, etc.).\n\
+              Useful for monitoring, building harnesses, and debugging agent coordination."
+)]
 pub struct EventsCommand {
     #[command(subcommand)]
     command: EventsSubcommand,
@@ -15,27 +21,32 @@ pub struct EventsCommand {
 
 #[derive(Subcommand, Debug)]
 enum EventsSubcommand {
+    #[command(about = "List past events with optional filters")]
     List(ListEventsArgs),
+    #[command(about = "Watch for new events in real-time (polls every 1s)")]
     Watch(WatchEventsArgs),
 }
 
 #[derive(Args, Debug)]
 struct ListEventsArgs {
-    #[arg(long)]
+    #[arg(long, help = "Project ID")]
     project: String,
-    #[arg(long = "type", value_parser = parse_event_type)]
+    #[arg(long = "type", value_parser = parse_event_type, help = "Filter by event type")]
     event_type: Option<EventType>,
-    #[arg(long)]
+    #[arg(
+        long,
+        help = "Only show events after this datetime (YYYY-MM-DD HH:MM:SS)"
+    )]
     since: Option<String>,
-    #[arg(long)]
+    #[arg(long, help = "Max number of events to return")]
     limit: Option<usize>,
 }
 
 #[derive(Args, Debug)]
 struct WatchEventsArgs {
-    #[arg(long)]
+    #[arg(long, help = "Project ID")]
     project: String,
-    #[arg(long = "type", value_parser = parse_event_type)]
+    #[arg(long = "type", value_parser = parse_event_type, help = "Filter by event type")]
     event_type: Option<EventType>,
 }
 

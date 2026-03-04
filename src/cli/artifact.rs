@@ -7,6 +7,12 @@ use clap::{Args, Subcommand};
 use std::fs;
 
 #[derive(Args, Debug)]
+#[command(
+    about = "Attach, read, and list artifacts (files, outputs) on tasks",
+    long_about = "Attach, read, and list artifacts on tasks.\n\n\
+              Artifacts are named outputs attached to tasks — code files, configs, reports, etc.\n\
+              Downstream tasks can read artifacts from their dependencies via the handoff protocol."
+)]
 pub struct ArtifactCommand {
     #[command(subcommand)]
     command: ArtifactSubcommand,
@@ -14,38 +20,41 @@ pub struct ArtifactCommand {
 
 #[derive(Subcommand, Debug)]
 enum ArtifactSubcommand {
+    #[command(about = "Write an artifact to a task (from file or inline content)")]
     Write(WriteArtifactArgs),
+    #[command(about = "Read an artifact by name from a task")]
     Read(ReadArtifactArgs),
+    #[command(about = "List all artifacts attached to a task")]
     List(ListArtifactArgs),
 }
 
 #[derive(Args, Debug)]
 struct WriteArtifactArgs {
-    #[arg(long)]
+    #[arg(long, help = "Task ID to attach artifact to")]
     task: String,
-    #[arg(long)]
+    #[arg(long, help = "Artifact name (used for retrieval)")]
     name: String,
-    #[arg(long)]
+    #[arg(long, help = "Read artifact content from this file path")]
     file: Option<String>,
-    #[arg(long)]
+    #[arg(long, help = "Inline artifact content (alternative to --file)")]
     content: Option<String>,
-    #[arg(long)]
+    #[arg(long, help = "Artifact kind (e.g. source, config, report)")]
     kind: Option<String>,
-    #[arg(long)]
+    #[arg(long, help = "MIME type (e.g. application/json, text/plain)")]
     mime: Option<String>,
 }
 
 #[derive(Args, Debug)]
 struct ReadArtifactArgs {
-    #[arg(long)]
+    #[arg(long, help = "Task ID")]
     task: String,
-    #[arg(long)]
+    #[arg(long, help = "Artifact name to read")]
     name: String,
 }
 
 #[derive(Args, Debug)]
 struct ListArtifactArgs {
-    #[arg(long)]
+    #[arg(long, help = "Task ID to list artifacts for")]
     task: String,
 }
 
