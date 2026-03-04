@@ -144,50 +144,50 @@ enum WhatIfSubcommand {
 }
 
 #[derive(Args, Debug)]
-struct CreateTaskArgs {
+pub struct CreateTaskArgs {
     #[arg(long, help = "Project ID (uses default if set via 'planq use')")]
-    project: Option<String>,
+    pub project: Option<String>,
     #[arg(long, help = "Task title (concise, descriptive)")]
-    title: String,
+    pub title: String,
     #[arg(long, value_name = "KIND", value_parser = parse_task_kind, help = "Task kind: generic, code, research, review, test, shell")]
-    kind: Option<TaskKind>,
+    pub kind: Option<TaskKind>,
     #[arg(long, help = "Detailed description of what the task involves")]
-    description: Option<String>,
+    pub description: Option<String>,
     #[arg(
         long,
         default_value_t = 0,
         help = "Priority (higher = more important, default: 0)"
     )]
-    priority: i32,
+    pub priority: i32,
     #[arg(
         long = "dep",
         help = "Dependency: TASK_ID (default: feeds_into) or TASK_ID:KIND where KIND is feeds_into|blocks|suggests"
     )]
-    deps: Vec<String>,
+    pub deps: Vec<String>,
     #[arg(long, help = "Parent task ID (for hierarchical decomposition)")]
-    parent: Option<String>,
+    pub parent: Option<String>,
     #[arg(
         long = "max-retries",
         default_value_t = 0,
         help = "Max auto-retry attempts on failure"
     )]
-    max_retries: i32,
+    pub max_retries: i32,
     #[arg(
         long = "timeout",
         help = "Timeout in seconds (reclaims task if exceeded)"
     )]
-    timeout_seconds: Option<i64>,
+    pub timeout_seconds: Option<i64>,
     #[arg(
         long = "requires-approval",
         default_value_t = false,
         help = "Require human approval before task completes"
     )]
-    requires_approval: bool,
+    pub requires_approval: bool,
     #[arg(
         long = "tag",
         help = "Tags for filtering (repeatable: --tag api --tag auth)"
     )]
-    tags: Vec<String>,
+    pub tags: Vec<String>,
 }
 
 #[derive(Args, Debug)]
@@ -199,26 +199,26 @@ struct CreateBatchArgs {
 }
 
 #[derive(Args, Debug)]
-struct ListTasksArgs {
+pub struct ListTasksArgs {
     #[arg(long)]
-    project: Option<String>,
+    pub project: Option<String>,
     #[arg(long, value_parser = parse_task_status)]
-    status: Option<TaskStatus>,
+    pub status: Option<TaskStatus>,
     #[arg(long, value_parser = parse_task_kind)]
-    kind: Option<TaskKind>,
+    pub kind: Option<TaskKind>,
     #[arg(long)]
-    tag: Option<String>,
+    pub tag: Option<String>,
     #[arg(long)]
-    agent: Option<String>,
+    pub agent: Option<String>,
     #[arg(long)]
-    json: bool,
+    pub json: bool,
 }
 
 #[derive(Args, Debug)]
-struct GetTaskArgs {
-    task_id: String,
+pub struct GetTaskArgs {
+    pub task_id: String,
     #[arg(long)]
-    json: bool,
+    pub json: bool,
 }
 
 #[derive(Args, Debug)]
@@ -253,26 +253,26 @@ struct ProgressArgs {
 }
 
 #[derive(Args, Debug)]
-struct DoneArgs {
+pub struct DoneArgs {
     #[arg(help = "ID of the task to complete")]
-    task_id: String,
+    pub task_id: String,
     #[arg(
         long,
         help = "Result data (JSON string or plain text, passed to downstream tasks via handoff)"
     )]
-    result: Option<String>,
+    pub result: Option<String>,
     #[arg(
         long,
         help = "Files modified by this task (comma-separated paths, enables conflict detection)"
     )]
-    files: Option<String>,
+    pub files: Option<String>,
     #[arg(
         long,
         help = "After completing, claim + start next ready task (requires --agent)"
     )]
-    next: bool,
+    pub next: bool,
     #[arg(long, help = "Agent ID for --next (required when --next is used)")]
-    agent: Option<String>,
+    pub agent: Option<String>,
 }
 
 #[derive(Args, Debug)]
@@ -451,11 +451,11 @@ struct NotesArgs {
 }
 
 #[derive(Args, Debug)]
-struct GoArgs {
+pub struct GoArgs {
     #[arg(long, help = "Agent identifier (e.g. claude-1, agent-backend)")]
-    agent: String,
+    pub agent: String,
     #[arg(long, help = "Project ID (uses default if not set)")]
-    project: Option<String>,
+    pub project: Option<String>,
 }
 
 #[derive(Args, Debug)]
@@ -993,7 +993,12 @@ pub fn run(db: &Database, command: TaskCommand, global_json: bool, compact: bool
     Ok(())
 }
 
-fn create_task_cmd(db: &Database, args: CreateTaskArgs, json: bool, compact: bool) -> Result<()> {
+pub fn create_task_cmd(
+    db: &Database,
+    args: CreateTaskArgs,
+    json: bool,
+    compact: bool,
+) -> Result<()> {
     let now = Utc::now().naive_utc();
     let project_id = resolve_project_id(db, args.project.as_deref())?;
     let task = Task {
@@ -1160,7 +1165,7 @@ fn create_batch_cmd(db: &Database, args: CreateBatchArgs, json: bool) -> Result<
     Ok(())
 }
 
-fn list_tasks_cmd(
+pub fn list_tasks_cmd(
     db: &Database,
     args: ListTasksArgs,
     global_json: bool,
@@ -1236,7 +1241,7 @@ fn parse_dep_arg(dep: &str) -> Result<(String, DependencyKind)> {
     Ok((dep.to_string(), DependencyKind::FeedsInto))
 }
 
-fn parse_files_arg(files: &str) -> Vec<String> {
+pub fn parse_files_arg(files: &str) -> Vec<String> {
     files
         .split(',')
         .map(|s| s.trim())
@@ -1245,7 +1250,11 @@ fn parse_files_arg(files: &str) -> Vec<String> {
         .collect()
 }
 
-fn go_payload(db: &Database, project: Option<&str>, agent_id: &str) -> Result<serde_json::Value> {
+pub fn go_payload(
+    db: &Database,
+    project: Option<&str>,
+    agent_id: &str,
+) -> Result<serde_json::Value> {
     let project_id = resolve_project_id(db, project)?;
     let claimed = claim_next_task(db, &project_id, agent_id)?;
     let task = match claimed {
@@ -1563,7 +1572,7 @@ fn parse_new_subtasks(subtasks: Option<String>, file: Option<String>) -> Result<
     Err(anyhow!("provide either --subtasks or --file"))
 }
 
-fn print_task_detail(task: &Task) {
+pub fn print_task_detail(task: &Task) {
     println!("id: {}", task.id);
     println!("project: {}", task.project_id);
     println!("title: {}", task.title);

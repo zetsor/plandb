@@ -10,6 +10,9 @@ use clap::{Parser, Subcommand};
 use serde_json::{json, Value};
 use std::str::FromStr;
 
+// Re-export arg structs used by top-level aliases
+pub use task::{CreateTaskArgs, DoneArgs, GetTaskArgs, GoArgs, ListTasksArgs};
+
 #[derive(Parser, Debug)]
 #[command(
     name = "planq",
@@ -130,6 +133,16 @@ pub enum Commands {
         #[arg(long, help = "Show all tasks and dependencies")]
         full: bool,
     },
+    #[command(about = "Claim + start next ready task (shortcut for 'planq task go')")]
+    Go(GoArgs),
+    #[command(about = "Complete a task, optionally claim next (shortcut for 'planq task done')")]
+    Done(DoneArgs),
+    #[command(about = "List tasks with optional filters (shortcut for 'planq task list')")]
+    List(ListTasksArgs),
+    #[command(about = "Create a new task (shortcut for 'planq task create')")]
+    Add(CreateTaskArgs),
+    #[command(about = "Show full details of a task (shortcut for 'planq task get')")]
+    Show(GetTaskArgs),
     #[command(about = "Start MCP server (stdio JSON-RPC for Claude Code, Cursor, Windsurf)")]
     Mcp,
     #[command(about = "Start HTTP server with REST API and SSE event stream")]
@@ -198,6 +211,70 @@ pub fn run(db: &Database, cli: Cli) -> Result<()> {
             detail,
             full,
         } => project::status_cmd(db, project.as_deref(), detail, full, cli.json, cli.compact),
+        Commands::Go(args) => {
+            let response = task::go_payload(db, args.project.as_deref(), &args.agent)?;
+            if cli.json {
+                print_json(&response)?;
+            } else if response["task"].is_null() {
+                println!("no ready task found");
+            } else {
+                println!("started {}", response["task"]["id"].as_str().unwrap_or(""));
+            }
+            Ok(())
+        }
+        Commands::Done(args) => {
+            let result = match args.result {
+                Some(text) => match serde_json::from_str(&text) {
+                    Ok(v) => Some(v),
+                    Err(_) => Some(serde_json::Value::String(text)),
+                },
+                None => None,
+            };
+            let t = crate::db::complete_task(db, &args.task_id, result)?;
+            if let Some(files) = args.files {
+                let paths = task::parse_files_arg(&files);
+                let _ = crate::db::add_task_files(db, &t.id, &paths)?;
+            }
+            let _ = crate::db::promote_ready_tasks(db)?;
+            let next = if args.next {
+                let agent = args
+                    .agent
+                    .ok_or_else(|| anyhow!("--agent is required when using --next"))?;
+                Some(task::go_payload(db, Some(&t.project_id), &agent)?)
+            } else {
+                None
+            };
+            if cli.json {
+                if args.next {
+                    print_json(&json!({
+                        "completed": minimal_task(&t),
+                        "next": next,
+                    }))?;
+                } else if cli.compact {
+                    print_json(&minimal_task(&t))?;
+                } else {
+                    print_json(&t)?;
+                }
+            } else {
+                println!("completed {}", t.id);
+            }
+            Ok(())
+        }
+        Commands::List(args) => task::list_tasks_cmd(db, args, cli.json, cli.compact),
+        Commands::Add(args) => task::create_task_cmd(db, args, cli.json, cli.compact),
+        Commands::Show(args) => {
+            let t = crate::db::fuzzy_find_task(db, &args.task_id, None)?;
+            if cli.json || args.json {
+                if cli.compact {
+                    print_json(&compact_task(&t))?;
+                } else {
+                    print_json(&t)?;
+                }
+            } else {
+                task::print_task_detail(&t);
+            }
+            Ok(())
+        }
         Commands::Mcp | Commands::Serve { .. } | Commands::Prompt { .. } => {
             unreachable!("handled in main")
         }
